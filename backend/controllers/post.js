@@ -72,7 +72,6 @@ exports.delete = (req, res) => {
     //req => userId, postId, user.isAdmin
 
     let userOrder = req.body.userIdOrder;
-
     //identification du demandeur
 
     let id = utils.getUserId(req.headers.authorization)
@@ -81,51 +80,42 @@ exports.delete = (req, res) => {
         where: { id: id }
     })
         .then(user => {
-            logintest(user);
+            if (user && (user.isAdmin == true || user.id == userOrder)) {
+                console.log('Suppression du post id :', req.body.postId);
+                models.Post
+                    .findOne({
+                        where: { id: req.body.postId }
+                    })
+                    .then((postFind) => {
+
+                        console.log(postFind);
+
+                        if (postFind.attachement) {
+                            const filename = postFind.attachement.split('/images/')[1];
+                            console.log(filename);
+                            fs.unlink(`images/${filename}`, () => {
+                                models.Post
+                                    .destroy({
+                                        where: { id: postFind.id }
+                                    })
+                                    .then(() => res.end())
+                                    .catch(err => res.status(502).json(err))
+                            })
+                        }
+                        else {
+                            models.Post
+                                .destroy({
+                                    where: { id: postFind.id }
+                                })
+                                .then(() => res.end())
+                                .catch(err => res.status(503).json(err))
+                        }
+                    })
+                    .catch(err => res.status(501).json(err))
+            } else { res.status(403).json('Utilisateur non autorisé à supprimer ce post') }
         })
-        .catch(error => res.status(500).json(error));
+        .catch(error => res.status(506).json(error));
 };
-
-//logintest est une fonction privée pour simplifier le code (découpage)
-
-function logintest(user) {
-
-    //Vérification que le demandeur est soit l'admin soit le poster (vérif aussi sur le front)
-
-    if (user && (user.isAdmin == true || user.id == userOrder)) {
-        console.log('Suppression du post id :', req.body.postId);
-        models.Post
-            .findOne({
-                where: { id: req.body.postId }
-            })
-            .then(postFind => getPostPublished(postFind))
-            .catch(err => res.status(500).json(err))
-    } else { res.status(403).json('Utilisateur non autorisé à supprimer ce post') }
-}
-
-function getPostPublished(postFind) {
-    if (postFind.attachement) {
-        const filename = postFind.attachement.split('/images/')[1];
-        console.log(filename);
-        fs.unlink(`images/${filename}`, () => {
-            models.Post
-                .destroy({
-                    where: { id: postFind.id }
-                })
-                .then(() => res.end())
-                .catch(err => res.status(500).json(err))
-        })
-    }
-    else {
-        models.Post
-            .destroy({
-                where: { id: postFind.id }
-            })
-            .then(() => res.end())
-            .catch(err => res.status(500).json(err))
-    }
-}
-
 
 
 
